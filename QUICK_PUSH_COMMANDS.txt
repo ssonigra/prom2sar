@@ -1,0 +1,24 @@
+# Quick Push to GitHub Commands
+
+# 1. Create repository on GitHub:
+#    https://github.com/new
+#    Name: prometheus-dump-operator
+#    Public, NO README/license/.gitignore
+
+# 2. Add remote (replace YOUR-USERNAME):
+git remote add origin https://github.com/YOUR-USERNAME/prometheus-dump-operator.git
+
+# 3. Verify remote:
+git remote -v
+
+# 4. Push to GitHub:
+git push -u origin main
+
+# 5. Verify on GitHub:
+#    https://github.com/YOUR-USERNAME/prometheus-dump-operator
+
+# DONE! 🎉
+
+# Optional: Create first release
+# git tag -a v1.0.0 -m "First release"
+# git push origin v1.0.0
