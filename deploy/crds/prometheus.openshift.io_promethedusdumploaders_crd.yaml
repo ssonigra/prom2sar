@@ -1,0 +1,116 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: prometheusdumploaders.prometheus.openshift.io
+spec:
+  group: prometheus.openshift.io
+  names:
+    kind: PrometheusDumpLoader
+    listKind: PrometheusDumpLoaderList
+    plural: prometheusdumploaders
+    singular: prometheusdumploader
+    shortNames:
+    - pdl
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+            - sourcePath
+            - targetPath
+            properties:
+              sourcePath:
+                type: string
+                description: Source path where Prometheus dumps are located (default /prometheus)
+                default: /prometheus
+              targetPath:
+                type: string
+                description: Target path where dumps should be copied
+              timeRange:
+                type: object
+                description: Optional time range filter for dumps
+                properties:
+                  start:
+                    type: string
+                    format: date-time
+                    description: Start time in RFC3339 format
+                  end:
+                    type: string
+                    format: date-time
+                    description: End time in RFC3339 format
+              filters:
+                type: object
+                description: Optional filters for dump selection
+                properties:
+                  metrics:
+                    type: array
+                    items:
+                      type: string
+                    description: List of metric names to filter
+                  labels:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    description: Label matchers
+              compression:
+                type: boolean
+                description: Whether to compress copied dumps
+                default: false
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: Current phase (Pending, InProgress, Completed, Failed)
+              message:
+                type: string
+                description: Human-readable status message
+              bytesCopied:
+                type: integer
+                format: int64
+                description: Total bytes copied
+              filesCopied:
+                type: integer
+                description: Number of files copied
+              lastUpdateTime:
+                type: string
+                format: date-time
+                description: Last status update time
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Files Copied
+      type: integer
+      jsonPath: .status.filesCopied
+    - name: Bytes Copied
+      type: integer
+      jsonPath: .status.bytesCopied
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp

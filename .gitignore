@@ -1,0 +1,56 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+prom2sar
+prom2sar-*
+prometheus-dump-operator
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Build artifacts
+*.o
+*.a
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# SAR output (for testing)
+sar-output/
+*.sar
+
+# Kubernetes
+kubeconfig
+
+# Local testing
+testdata/prometheus/
+must-gather.local.*/
+
+# Environment
+.env
+.env.local

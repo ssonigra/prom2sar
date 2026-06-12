@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Run go fmt
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Go code is not formatted:"
+            gofmt -d .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.21', '1.22']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-${{ matrix.go-version }}
+
+  build-cli:
+    name: Build CLI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build CLI binary
+        run: make build-cli
+
+      - name: Test CLI binary
+        run: ./bin/prom2sar --version
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: prom2sar-${{ github.sha }}
+          path: bin/prom2sar
+
+  build-operator:
+    name: Build Operator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build operator binary
+        run: make build
+
+      - name: Upload operator artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: prometheus-dump-operator-${{ github.sha }}
+          path: bin/prometheus-dump-operator
+
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: prometheus-dump-operator:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-cli]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download CLI artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: prom2sar-${{ github.sha }}
+          path: bin/
+
+      - name: Make binary executable
+        run: chmod +x bin/prom2sar
+
+      - name: Run integration tests
+        run: |
+          # Add integration test commands here
+          echo "Integration tests would run here"
+          # Example: ./bin/prom2sar -tsdb testdata/prometheus -output /tmp/test

@@ -1,0 +1,19 @@
+apiVersion: prometheus.openshift.io/v1alpha1
+kind: PrometheusDumpLoader
+metadata:
+  name: cpu-metrics-sar
+  namespace: default
+spec:
+  sourcePath: /prometheus
+  targetPath: /var/lib/prometheus-dumps
+
+  timeRange:
+    start: "2026-06-12T00:00:00Z"
+    end: "2026-06-12T12:00:00Z"
+
+  sarConversion:
+    enabled: true
+    outputPath: /var/lib/sar-output/cpu
+    format: text
+    interval: 30  # 30 second intervals for detailed CPU analysis
+    metricsProfile: cpu  # Only extract CPU metrics

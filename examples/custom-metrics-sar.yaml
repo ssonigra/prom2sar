@@ -1,0 +1,33 @@
+apiVersion: prometheus.openshift.io/v1alpha1
+kind: PrometheusDumpLoader
+metadata:
+  name: custom-metrics-sar
+  namespace: default
+spec:
+  sourcePath: /prometheus
+  targetPath: /var/lib/prometheus-dumps
+
+  timeRange:
+    start: "2026-06-12T00:00:00Z"
+    end: "2026-06-12T23:59:59Z"
+
+  sarConversion:
+    enabled: true
+    outputPath: /var/lib/sar-output/custom
+    format: text
+    interval: 60
+    metricsProfile: custom
+
+    # Custom metric mappings (advanced usage)
+    customMetrics:
+      - prometheusMetric: "container_cpu_usage_seconds_total"
+        sarField: "custom_container_cpu"
+        labelSelector:
+          namespace: "default"
+        aggregation: "avg"
+
+      - prometheusMetric: "container_memory_working_set_bytes"
+        sarField: "custom_container_memory"
+        labelSelector:
+          namespace: "default"
+        aggregation: "sum"

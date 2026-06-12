@@ -1,0 +1,32 @@
+apiVersion: prometheus.openshift.io/v1alpha1
+kind: PrometheusDumpLoader
+metadata:
+  name: prometheus-to-sar
+  namespace: default
+spec:
+  # Source path where Prometheus TSDB blocks are located
+  sourcePath: /prometheus
+
+  # Target path where dumps will be copied
+  targetPath: /var/lib/prometheus-dumps
+
+  # Optional: filter by time range
+  timeRange:
+    start: "2026-06-11T00:00:00Z"
+    end: "2026-06-12T23:59:59Z"
+
+  # Enable sar conversion
+  sarConversion:
+    enabled: true
+
+    # Output path for sar files
+    outputPath: /var/lib/sar-output
+
+    # Output format: text or binary (text is recommended)
+    format: text
+
+    # Sampling interval in seconds (default: 60)
+    interval: 60
+
+    # Metrics profile: all, cpu, memory, disk, network
+    metricsProfile: all
