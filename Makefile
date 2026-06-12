@@ -41,11 +41,11 @@ deps: ## Download and verify dependencies
 
 .PHONY: build
 build: deps fmt vet ## Build operator binary
-	go build -o bin/prometheus-dump-operator cmd/main.go
+	go build -o bin/prometheus-dump-operator ./cmd/main.go
 
 .PHONY: build-cli
 build-cli: deps fmt vet ## Build standalone CLI binary (prom2sar)
-	go build -o bin/prom2sar cmd/prom2sar/main.go
+	go build -o bin/prom2sar ./cmd/prom2sar/main.go
 
 .PHONY: build-all
 build-all: deps build build-cli ## Build both operator and CLI
