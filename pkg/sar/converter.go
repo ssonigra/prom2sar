@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	v1alpha1 "github.com/prometheus/prometheus-dump-operator/pkg/apis/prometheus/v1alpha1"
 	"github.com/prometheus/prometheus-dump-operator/pkg/tsdb"
 )
@@ -135,6 +137,6 @@ func (c *Converter) generateTextOutput(data []*SarData, startTime, endTime time.
 	return outputFiles, nil
 }
 
-func toMetaTime(t time.Time) time.Time {
-	return t
+func toMetaTime(t time.Time) metav1.Time {
+	return metav1.Time{Time: t}
 }

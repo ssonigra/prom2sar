@@ -46,13 +46,13 @@ func (r *Reader) Close() error {
 
 // Query queries time series data
 func (r *Reader) Query(ctx context.Context, startTime, endTime int64, matchers ...*labels.Matcher) ([]*TimeSeriesData, error) {
-	querier, err := r.db.Querier(ctx, startTime, endTime)
+	querier, err := r.db.Querier(startTime, endTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create querier: %w", err)
 	}
 	defer querier.Close()
 
-	ss := querier.Select(false, nil, matchers...)
+	ss := querier.Select(ctx, false, nil, matchers...)
 
 	var result []*TimeSeriesData
 	for ss.Next() {
@@ -101,7 +101,10 @@ func (r *Reader) QueryMetric(ctx context.Context, metricName string, startTime, 
 
 // GetBlocks returns information about available blocks
 func (r *Reader) GetBlocks() ([]BlockInfo, error) {
-	blocks := r.db.Blocks()
+	blocks, err := r.db.Blocks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blocks: %w", err)
+	}
 
 	result := make([]BlockInfo, len(blocks))
 	for i, block := range blocks {
