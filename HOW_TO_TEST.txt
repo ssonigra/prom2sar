@@ -1,0 +1,364 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║              HOW TO TEST prom2sar - Step by Step Guide              ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+Repository: https://github.com/ssonigra/prom2sar
+Date: June 12, 2026
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 0: VERIFY BUILD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cd /home/ssonigra/reprod/claude/prometheus-dump-operator
+
+# Ensure binary exists
+ls -lh bin/prom2sar
+# Should show: -rwxr-xr-x ... 29M ... bin/prom2sar
+
+# If not built, run:
+make build-cli
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1: QUICK SMOKE TEST (30 seconds)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+./QUICK_TEST.sh
+
+Expected output:
+  ✓ Test 1: Binary exists... PASS
+  ✓ Test 2: Version check... PASS (prom2sar version 1.0.0)
+  ✓ Test 3: Help output... PASS
+  ✓ Test 4: Error handling (no tsdb)... PASS
+  ✓ Test 5: Invalid path handling... PASS
+  ✓ Test 6: Invalid time format... PASS
+  ✓ Test 7: Invalid profile... PASS
+  
+  All Tests Passed!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2: TEST WITH DOCKER (RECOMMENDED - 10 minutes)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This creates a real Prometheus + Node Exporter environment with sample data.
+
+# 1. Create test directory
+mkdir -p /tmp/prom-test
+cd /tmp/prom-test
+
+# 2. Create docker-compose.yml
+cat > docker-compose.yml << 'DOCKEREOF'
+version: '3'
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+volumes:
+  prometheus-data:
+DOCKEREOF
+
+# 3. Create Prometheus config
+cat > prometheus.yml << 'PROMEOF'
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+PROMEOF
+
+# 4. Start services
+docker-compose up -d
+
+# 5. Wait for data collection (5 minutes)
+echo "Collecting metrics... waiting 5 minutes"
+for i in {1..300}; do
+  echo -ne "Progress: $i/300 seconds\r"
+  sleep 1
+done
+echo ""
+
+# 6. Extract data from Docker volume
+VOLUME=$(docker volume ls -q | grep prom-test_prometheus-data)
+echo "Found volume: $VOLUME"
+
+docker run --rm \
+  -v ${VOLUME}:/source \
+  -v $(pwd)/data:/target \
+  alpine sh -c "cp -r /source/* /target/"
+
+echo "Data extracted to: $(pwd)/data"
+ls -lh data/
+
+# 7. Stop containers (cleanup)
+docker-compose down
+
+# 8. Test prom2sar
+cd /home/ssonigra/reprod/claude/prometheus-dump-operator
+
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -output /tmp/prom-test/results \
+  -verbose
+
+# 9. View results
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "SUMMARY OUTPUT:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+cat /tmp/prom-test/results/sar-summary-*.txt
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "FULL REPORT (first 50 lines):"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+head -50 /tmp/prom-test/results/sar-*.txt
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3: TEST WITH REAL PROMETHEUS DATA (If available)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If you have existing Prometheus data:
+
+# Option A: Local Prometheus
+PROM_DATA="/var/lib/prometheus/data"
+
+# Option B: OpenShift Prometheus
+# First, copy data from OpenShift:
+oc exec -n openshift-monitoring prometheus-k8s-0 -- tar czf - /prometheus | tar xzf -
+PROM_DATA="./prometheus"
+
+# Run conversion
+./bin/prom2sar \
+  -tsdb $PROM_DATA \
+  -output ./real-prom-results \
+  -verbose
+
+# View results
+cat real-prom-results/sar-summary-*.txt
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4: TEST DIFFERENT PROFILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# CPU metrics only (like sar -u)
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -profile cpu \
+  -output ./test-cpu
+
+# Memory metrics only (like sar -r)
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -profile memory \
+  -output ./test-memory
+
+# Disk I/O only (like sar -d)
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -profile disk \
+  -output ./test-disk
+
+# Network I/O only (like sar -n DEV)
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -profile network \
+  -output ./test-network
+
+# All metrics (default)
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -profile all \
+  -output ./test-all
+
+# Compare outputs
+ls -lh test-*/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5: TEST TIME RANGES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Last 24 hours (default)
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -output ./test-24h
+
+# Specific date range
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -start 2026-06-12T00:00:00Z \
+  -end 2026-06-12T12:00:00Z \
+  -output ./test-specific
+
+# Last hour
+START=$(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ')
+END=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+./bin/prom2sar \
+  -tsdb /tmp/prom-test/data \
+  -start "$START" \
+  -end "$END" \
+  -output ./test-last-hour
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6: ANALYZE OUTPUT (LIKE KERNEL ENGINEER WOULD)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cd /tmp/prom-test/results
+
+# View summary
+cat sar-summary-*.txt
+
+# Find CPU spikes above 80%
+echo "CPU spikes:"
+awk '/CPU/ && $2 > 80 {print $0}' sar-*.txt
+
+# Find memory pressure (less than 100MB free)
+echo "Memory pressure:"
+grep -A 5 "Memory" sar-*.txt | awk '$2 < 100000 {print}'
+
+# Find disk bottlenecks (>90% utilization)
+echo "Disk bottlenecks:"
+grep -A 10 "Disk" sar-*.txt | awk '$NF > 90 {print}'
+
+# Find network errors
+echo "Network errors:"
+grep -A 10 "Network" sar-*.txt | awk '$5 > 0 || $6 > 0 {print}'
+
+# Search for specific time
+echo "Data at 12:00:00:"
+grep "12:00:00" sar-*.txt
+
+# Export all data points for a specific time window
+grep -E "12:[0-5][0-9]:" sar-*.txt > noon-hour-data.txt
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 7: REAL-WORLD INCIDENT INVESTIGATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Scenario: Application had issues on June 12 between 10am and 12pm
+
+# 1. Convert only the incident time window
+./bin/prom2sar \
+  -tsdb /var/lib/prometheus/data \
+  -start 2026-06-12T10:00:00Z \
+  -end 2026-06-12T12:00:00Z \
+  -output ./incident-2026-06-12 \
+  -profile all \
+  -verbose
+
+cd incident-2026-06-12
+
+# 2. Check overall summary
+cat sar-summary-*.txt
+
+# 3. Find CPU spikes during incident
+grep -A 2 "CPU" sar-*.txt | \
+  grep -v "all" | \
+  awk '{if ($2 > 80) print "CPU spike at", $1, "-", $2"%"}'
+
+# 4. Check memory at exact incident time (e.g., 10:45am)
+echo "Memory at incident time:"
+grep "10:45" sar-*.txt | grep -A 5 "Memory"
+
+# 5. Check disk I/O at incident time
+echo "Disk I/O at incident time:"
+grep -A 10 "Disk" sar-*.txt | grep "10:45"
+
+# 6. Check network activity
+echo "Network activity:"
+grep -A 10 "Network" sar-*.txt | grep "10:45"
+
+# 7. Package for sharing with team
+tar czf incident-sar-data.tar.gz sar-*.txt
+echo "Created: incident-sar-data.tar.gz"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUCCESS CRITERIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Binary runs without crashes
+✓ Files created: sar-YYYYMMDD.txt, sar-summary-YYYYMMDD.txt
+✓ Summary shows statistics (CPU, Memory, etc.)
+✓ Full report has timestamp columns with metrics
+✓ Data values are reasonable (not all zeros, not extreme)
+✓ Time ranges match your request
+✓ Can use grep/awk/sed on output files
+✓ Verbose mode shows progress messages
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXPECTED OUTPUT EXAMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Summary file (sar-summary-*.txt):
+  === Prometheus to SAR Conversion Summary ===
+  Source: prometheus-tsdb
+  Time Range: 2026-06-11 12:00:00 to 2026-06-12 12:00:00
+  Duration: 24h0m0s
+  Data Points: 1440
+
+  === System Statistics ===
+  CPU:
+    Average User:   15.3%
+    Average System: 8.2%
+    Average Idle:   74.4%
+
+  Memory:
+    Total:     16384 MB
+    Used Avg:  8192 MB (50.0%)
+
+Full report file (sar-*.txt):
+  12:00:00    CPU    %user  %nice  %system  %iowait  %idle
+  12:01:00    all    15.32   0.00     8.21     2.14  74.33
+  12:02:00    all    16.45   0.00     7.89     1.98  73.68
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Problem: "Error: TSDB path does not exist"
+  → Check the path is correct
+  → Ensure you have read permissions
+  → Verify it's a Prometheus data directory with blocks
+
+Problem: "No data found in the specified time range"
+  → Check TSDB blocks time ranges with -verbose
+  → Adjust start/end times to match available data
+  → Ensure Prometheus collected data during that period
+
+Problem: Binary not found
+  → Run: make build-cli
+  → Check: ls -lh bin/prom2sar
+
+Problem: Permission denied
+  → Run: chmod +x bin/prom2sar
+  → Or use: sudo ./bin/prom2sar ...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DOCUMENTATION REFERENCES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TESTING.md           - Complete testing guide (detailed scenarios)
+QUICK_TEST.sh        - Automated smoke test script
+CLI_GUIDE.md         - Full CLI usage reference
+BUILD_SUCCESS.md     - Build verification report
+SAR_CONVERSION_GUIDE.md - Conversion details and format
+README.md            - Project overview
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REPOSITORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GitHub: https://github.com/ssonigra/prom2sar
+Issues: https://github.com/ssonigra/prom2sar/issues
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
