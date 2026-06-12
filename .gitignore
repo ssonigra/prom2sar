@@ -6,9 +6,9 @@ dist/
 *.dll
 *.so
 *.dylib
-prom2sar
+/prom2sar
 prom2sar-*
-prometheus-dump-operator
+/prometheus-dump-operator
 
 # Test artifacts
 *.test
