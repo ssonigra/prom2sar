@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/prometheus-dump-operator/pkg/apis/prometheus/v1alpha1"
+	"github.com/prometheus/prometheus-dump-operator/pkg/apis/prometheus/v1alpha1"
 )
 
 // DumpLoader handles copying Prometheus dumps

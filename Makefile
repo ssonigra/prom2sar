@@ -31,22 +31,32 @@ test: fmt vet ## Run tests
 
 ##@ Build
 
+.PHONY: deps
+deps: ## Download and verify dependencies
+	@echo "Downloading Go dependencies..."
+	go mod download
+	go mod tidy
+	go mod verify
+	@echo "✓ Dependencies ready"
+
 .PHONY: build
-build: fmt vet ## Build operator binary
+build: deps fmt vet ## Build operator binary
 	go build -o bin/prometheus-dump-operator cmd/main.go
 
 .PHONY: build-cli
-build-cli: fmt vet ## Build standalone CLI binary (prom2sar)
+build-cli: deps fmt vet ## Build standalone CLI binary (prom2sar)
 	go build -o bin/prom2sar cmd/prom2sar/main.go
 
 .PHONY: build-all
-build-all: build build-cli ## Build both operator and CLI
+build-all: deps build build-cli ## Build both operator and CLI
 
 .PHONY: install-cli
 install-cli: build-cli ## Install CLI to /usr/local/bin (requires sudo)
+	@echo "Installing prom2sar to /usr/local/bin..."
 	sudo cp bin/prom2sar /usr/local/bin/
 	sudo chmod +x /usr/local/bin/prom2sar
-	@echo "prom2sar installed to /usr/local/bin/"
+	@echo "✓ prom2sar installed to /usr/local/bin/"
+	@echo "✓ Run 'prom2sar --version' to verify"
 
 .PHONY: run
 run: fmt vet ## Run operator locally

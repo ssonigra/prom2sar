@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prometheus-dump-operator/pkg/apis/prometheus/v1alpha1"
-	"github.com/prometheus-dump-operator/pkg/loader"
-	"github.com/prometheus-dump-operator/pkg/sar"
+	"github.com/prometheus/prometheus-dump-operator/pkg/apis/prometheus/v1alpha1"
+	"github.com/prometheus/prometheus-dump-operator/pkg/loader"
+	"github.com/prometheus/prometheus-dump-operator/pkg/sar"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

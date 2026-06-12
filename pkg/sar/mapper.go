@@ -41,16 +41,16 @@ type CPUStats struct {
 
 // MemoryStats represents memory utilization (sar -r)
 type MemoryStats struct {
-	MemTotal     float64 // kbmemfree
-	MemUsed      float64 // kbmemused
-	MemFree      float64 // kbmemfree
-	MemCached    float64 // kbcached
-	MemBuffers   float64 // kbbuffers
-	SwapTotal    float64 // kbswpfree
-	SwapUsed     float64 // kbswpused
-	SwapFree     float64 // kbswpfree
-	MemPercent   float64 // %memused
-	SwapPercent  float64 // %swpused
+	MemTotal    float64 // kbmemfree
+	MemUsed     float64 // kbmemused
+	MemFree     float64 // kbmemfree
+	MemCached   float64 // kbcached
+	MemBuffers  float64 // kbbuffers
+	SwapTotal   float64 // kbswpfree
+	SwapUsed    float64 // kbswpused
+	SwapFree    float64 // kbswpfree
+	MemPercent  float64 // %memused
+	SwapPercent float64 // %swpused
 }
 
 // DiskStats represents disk I/O (sar -d)
@@ -59,10 +59,10 @@ type DiskStats struct {
 }
 
 type DiskDevice struct {
-	Device string
-	TPS    float64 // transfers per second
-	RdKBs  float64 // read KB/s
-	WrKBs  float64 // write KB/s
+	Device  string
+	TPS     float64 // transfers per second
+	RdKBs   float64 // read KB/s
+	WrKBs   float64 // write KB/s
 	AvgRqSz float64 // average request size
 	AvgQuSz float64 // average queue size
 	Await   float64 // average wait time
